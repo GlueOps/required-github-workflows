@@ -2,6 +2,21 @@
 ## This is managed via https://github.com/internal-GlueOps/github-shared-files-sync . Any changes to this file may be overridden by our automation
 ####
 
+####
+## DEPRECATED -- delete this file once this branch is merged to main and the
+## repository rules that require it have been retired.
+##
+## The only label it applies, `include-in-release-notes`, exists solely for
+## `.github/release.yml`, GitHub's auto-generated release notes config. This org
+## cuts releases with release-please, which builds its own release body from the
+## changelog and never reads `.github/release.yml` -- so the label has no
+## consumer. It is kept only because existing rules still enforce its presence.
+##
+## To retire: drop this file and `.github/release.yml` from
+## github-shared-files-sync, then remove the "Add default PR Labels" step in
+## .github/workflows/glueops-basic-pr-checks.yml.
+####
+
 include-in-release-notes:
 - changed-files:
   - any-glob-to-any-file: '**'
