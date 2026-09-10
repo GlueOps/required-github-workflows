@@ -36,7 +36,20 @@ jobs:
 > `edited`, retitling a PR to fix a failed title check never re-runs the check
 > and the PR stays red.
 
-No configuration file is required in the calling repository.
+### Required in the calling repository
+
+`.github/configs/labeler.yml` — distributed by
+[`github-shared-files-sync`](https://github.com/internal-GlueOps/github-shared-files-sync).
+`actions/labeler` resolves `configuration-path` against the **calling** repo, not
+this one.
+
+> [!NOTE]
+> This file and the `Add default PR Labels` step are **deprecated**. The only
+> label they apply, `include-in-release-notes`, exists for
+> `.github/release.yml` — GitHub's auto-generated release notes config — which
+> release-please ignores, since it writes its own release body from the
+> changelog. They are retained only because existing repository rules still
+> require them. See [Deprecations](#deprecations).
 
 ## What gets validated
 
@@ -110,6 +123,17 @@ They were consumed only by `.github/release.yml`, which release-please ignores �
 it writes its own release body from the changelog. Renovate never read them
 either; `auto-merge.json` gates on `matchUpdateTypes`, Renovate's internal
 update classification, not GitHub labels.
+
+## Deprecations
+
+The `Add default PR Labels` step and `.github/configs/labeler.yml` are on their
+way out. They apply a single label, `include-in-release-notes`, to every pull
+request, and nothing consumes it: its only reader is `.github/release.yml`, and
+this org releases through release-please, which never reads that file.
+
+They remain only because existing repository rules still require them. To
+retire: drop `.github/configs/labeler.yml` and `.github/release.yml` from
+`github-shared-files-sync`, then delete the step from this workflow.
 
 ## Known limitations
 

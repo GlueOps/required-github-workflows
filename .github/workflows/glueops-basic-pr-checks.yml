@@ -65,3 +65,17 @@ jobs:
             build
             ci
           validateSingleCommit: true
+
+      # DEPRECATED -- remove once the repository rules that require it are
+      # retired. Applies `include-in-release-notes` to every PR, a label only
+      # `.github/release.yml` consumes; release-please writes its own release
+      # body from the changelog and never reads that file.
+      #
+      # Needs `.github/configs/labeler.yml` in the CALLING repo, not this one:
+      # actions/labeler resolves configuration-path against github.context.repo,
+      # falling back to the Contents API when the file is not on disk (so this
+      # still needs no checkout step).
+      - name: Add default PR Labels
+        uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          configuration-path: ".github/configs/labeler.yml"
