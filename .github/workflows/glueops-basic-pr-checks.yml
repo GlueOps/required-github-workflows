@@ -3,44 +3,65 @@ name: GlueOps Standard Checks
 on:
   workflow_call:
   pull_request:
+    # 'edited' is required: without it, retitling a PR to fix a failed title
+    # check never re-runs the check. Callers using workflow_call must include it
+    # in their own trigger too.
+    types: [opened, edited, synchronize, reopened]
 
+# Commit types recognized by release-please (its DEFAULT_HEADINGS set). Anything
+# outside this list is silently dropped by release-please -- parse failures are
+# only logged at debug level -- so it must not be allowed here either.
+#
+# Breaking changes are signalled with a "!" after the type/scope (feat!: /
+# feat(api)!:) or a "BREAKING CHANGE:" footer. "breaking", "major" and "hotfix"
+# are NOT release-please types: release-please parses them as an ordinary type
+# and falls through to a patch bump.
+env:
+  RELEASE_PLEASE_TYPES: "feat,fix,perf,deps,revert,docs,style,chore,refactor,test,build,ci"
 
 jobs:
+  # Job id is load-bearing: it forms the branch-protection check name
+  # "PR_CHECKS_AND_LABELS / PR_CHECKS_AND_LABELS" in every calling repo.
+  # Renaming it silently breaks required status checks, so it stays as-is even
+  # though this workflow no longer assigns labels.
   PR_CHECKS_AND_LABELS:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
+      # Covers merge-commit and rebase merges, where every commit lands on the
+      # default branch verbatim.
       - name: Validate Conventional Commit Messages
         uses: webiny/action-conventional-commits@8bc41ff4e7d423d56fa4905f6ff79209a78776c7 # v1.3.0
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Optional, for private repositories.
-          allowed-commit-types: "fix,docs,style,refactor,test,chore,pref,ci,chore,feat,breaking,major,revert"
+          allowed-commit-types: ${{ env.RELEASE_PLEASE_TYPES }}
 
-      - name: Add default PR Labels
-        uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9 # v5
+      # Covers squash merges. squash_merge_commit_title is COMMIT_OR_PR_TITLE,
+      # so the PR title becomes the commit release-please parses on a
+      # multi-commit squash, and the lone commit message on a single-commit one
+      # (hence validateSingleCommit).
+      #
+      # This action parses with conventional-changelog-conventionalcommits, the
+      # same preset release-please depends on, so it understands the "!"
+      # breaking-change marker natively.
+      #
+      # 'types' is newline-delimited here; keep it in sync with
+      # RELEASE_PLEASE_TYPES above.
+      - name: Validate PR Title
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          configuration-path: ".github/configs/labeler.yml"
-
-      - name: Assign PR Labels based on conventional commit messages
-        id: action-assign-labels
-        uses: mauroalderete/action-assign-labels@671a4ca2da0f900464c58b8b5540a1e07133e915 # v1
-        with:
-          pull-request-number: ${{ github.event.pull_request.number }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          conventional-commits: |
-            conventional-commits:
-              - type: 'fix'
-                nouns: ['fix', 'docs', 'style', 'refactor', 'test', 'chore', 'pref', 'ci', 'hotfix']
-                labels: ['patch']
-              - type: 'feature'
-                nouns: ['feat']
-                labels: ['minor','enhancement']
-              - type: 'breaking_change'
-                nouns: ['breaking', 'major', 'BREAKING']
-                labels: ['major']
-          maintain-labels-not-matched: false
-          apply-changes: true
+          types: |
+            feat
+            fix
+            perf
+            deps
+            revert
+            docs
+            style
+            chore
+            refactor
+            test
+            build
+            ci
+          validateSingleCommit: true
