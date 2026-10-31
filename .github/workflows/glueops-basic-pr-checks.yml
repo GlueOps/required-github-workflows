@@ -11,8 +11,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write # actions/labeler adds labels
-  issues: write # actions/labeler creates a label the first time a repo needs it
+  pull-requests: read
 
 jobs:
   # Job id is load-bearing: it forms the branch-protection check name
@@ -49,18 +48,3 @@ jobs:
             test
             build
             ci
-
-      # DEPRECATED -- remove once the repository rules that require it are
-      # retired. Applies `include-in-release-notes` to every PR, a label only
-      # `.github/release.yml` consumes; release-please writes its own release
-      # body from the changelog and never reads that file.
-      #
-      # Needs `.github/configs/labeler.yml` in the CALLING repo, not this one:
-      # actions/labeler resolves configuration-path against github.context.repo,
-      # falling back to the Contents API when the file is not on disk (so this
-      # still needs no checkout step).
-      - name: Add default PR Labels
-        if: github.event_name != 'merge_group'
-        uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
-        with:
-          configuration-path: ".github/configs/labeler.yml"

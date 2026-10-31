@@ -41,21 +41,6 @@ repo's `main` on every PR and merge queue run.
 > or push a commit. Repos calling it with `workflow_call` should include
 > `edited` in their trigger, as above, so a retitle re-runs it.
 
-### Required in the calling repository
-
-`.github/configs/labeler.yml` — distributed by
-[`github-shared-files-sync`](https://github.com/internal-GlueOps/github-shared-files-sync).
-`actions/labeler` resolves `configuration-path` against the **calling** repo, not
-this one.
-
-> [!NOTE]
-> This file and the `Add default PR Labels` step are **deprecated**. The only
-> label they apply, `include-in-release-notes`, exists for
-> `.github/release.yml` — GitHub's auto-generated release notes config — which
-> release-please ignores, since it writes its own release body from the
-> changelog. They are retained only because existing repository rules still
-> require them. See [Deprecations](#deprecations).
-
 ## What gets validated
 
 Only the **PR title**. The org allows squash merges only, with
@@ -117,22 +102,13 @@ release-please derives the bump from the commits, not from any label:
 | Any other recognized type | patch |
 | Unrecognized type | none — the commit is dropped |
 
-This workflow no longer applies `patch`/`minor`/`major`/`enhancement` labels.
+This workflow applies no labels. It used to add `patch`/`minor`/`major`/`enhancement`
+and `include-in-release-notes`. `.github/configs/labeler.yml` (synced into repos by
+`github-shared-files-sync`) is no longer read by this workflow.
 They were consumed only by `.github/release.yml`, which release-please ignores —
 it writes its own release body from the changelog. Renovate never read them
 either; `auto-merge.json` gates on `matchUpdateTypes`, Renovate's internal
 update classification, not GitHub labels.
-
-## Deprecations
-
-The `Add default PR Labels` step and `.github/configs/labeler.yml` are on their
-way out. They apply a single label, `include-in-release-notes`, to every pull
-request, and nothing consumes it: its only reader is `.github/release.yml`, and
-this org releases through release-please, which never reads that file.
-
-They remain only because existing repository rules still require them. To
-retire: drop `.github/configs/labeler.yml` and `.github/release.yml` from
-`github-shared-files-sync`, then delete the step from this workflow.
 
 ## Conventions
 
