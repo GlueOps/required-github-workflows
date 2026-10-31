@@ -3,21 +3,16 @@ name: GlueOps Standard Checks
 on:
   workflow_call:
   pull_request:
-    # 'edited' is required: without it, retitling a PR to fix a failed title
-    # check never re-runs the check. Callers using workflow_call must include it
-    # in their own trigger too.
+    # 'edited' re-runs the check after a retitle, but only for workflow_call
+    # callers: the org ruleset ignores 'types', so there a fixed title needs a
+    # re-run of the failed job (the title is read fresh from the API) or a push.
     types: [opened, edited, synchronize, reopened]
+  merge_group: # required checks must also report on merge queue runs
 
-# Commit types recognized by release-please (its DEFAULT_HEADINGS set). Anything
-# outside this list is silently dropped by release-please -- parse failures are
-# only logged at debug level -- so it must not be allowed here either.
-#
-# Breaking changes are signalled with a "!" after the type/scope (feat!: /
-# feat(api)!:) or a "BREAKING CHANGE:" footer. "breaking", "major" and "hotfix"
-# are NOT release-please types: release-please parses them as an ordinary type
-# and falls through to a patch bump.
-env:
-  RELEASE_PLEASE_TYPES: "feat,fix,perf,deps,revert,docs,style,chore,refactor,test,build,ci"
+permissions:
+  contents: read
+  pull-requests: write # actions/labeler adds labels
+  issues: write # actions/labeler creates a label the first time a repo needs it
 
 jobs:
   # Job id is load-bearing: it forms the branch-protection check name
@@ -27,26 +22,16 @@ jobs:
   PR_CHECKS_AND_LABELS:
     runs-on: ubuntu-latest
     steps:
-      # Covers merge-commit and rebase merges, where every commit lands on the
-      # default branch verbatim.
-      - name: Validate Conventional Commit Messages
-        uses: webiny/action-conventional-commits@7f91b1595ca1951cdb671ddc9f07a49081ec5b69 # v1.4.2
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Optional, for private repositories.
-          allowed-commit-types: ${{ env.RELEASE_PLEASE_TYPES }}
-
-      # Covers squash merges. squash_merge_commit_title is COMMIT_OR_PR_TITLE,
-      # so the PR title becomes the commit release-please parses on a
-      # multi-commit squash, and the lone commit message on a single-commit one
-      # (hence validateSingleCommit).
+      # Only the PR title reaches the default branch (squash-only, PR_TITLE), so
+      # commit messages are deliberately not checked. 'types' must be exactly
+      # release-please's DEFAULT_HEADINGS; see README "Accepted types".
       #
       # This action parses with conventional-changelog-conventionalcommits, the
       # same preset release-please depends on, so it understands the "!"
       # breaking-change marker natively.
-      #
-      # 'types' is newline-delimited here; keep it in sync with
-      # RELEASE_PLEASE_TYPES above.
       - name: Validate PR Title
+        # A merge_group run has no PR title; the title was already checked on the PR.
+        if: github.event_name != 'merge_group'
         uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,7 +49,6 @@ jobs:
             test
             build
             ci
-          validateSingleCommit: true
 
       # DEPRECATED -- remove once the repository rules that require it are
       # retired. Applies `include-in-release-notes` to every PR, a label only
@@ -76,6 +60,7 @@ jobs:
       # falling back to the Contents API when the file is not on disk (so this
       # still needs no checkout step).
       - name: Add default PR Labels
+        if: github.event_name != 'merge_group'
         uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
         with:
           configuration-path: ".github/configs/labeler.yml"

@@ -12,8 +12,8 @@ Please point to a tagged release.
 
 Validates that a pull request will produce the release
 [release-please](https://github.com/googleapis/release-please) is expected to
-cut. It checks commit messages and the PR title against the conventional commit
-types release-please actually recognizes.
+cut. It checks the PR title against the conventional commit types
+release-please actually recognizes.
 
 #### Usage
 
@@ -23,6 +23,7 @@ name: "GlueOps Standard Checks"
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  merge_group: # only needed if the repo uses a merge queue
 
 jobs:
   PR_CHECKS_AND_LABELS:
@@ -30,11 +31,15 @@ jobs:
     secrets: inherit
 ```
 
+Most repos don't call it at all: the `glueops` org ruleset runs it from this
+repo's `main` on every PR and merge queue run.
+
 > [!IMPORTANT]
-> The caller's trigger **must** include `edited`. GitHub's default
-> `pull_request` types are `opened`, `synchronize` and `reopened` — without
-> `edited`, retitling a PR to fix a failed title check never re-runs the check
-> and the PR stays red.
+> Fixing a PR title doesn't re-run the check on its own when it runs through the
+> org ruleset: rulesets ignore `types` and only trigger on `opened`,
+> `synchronize` and `reopened`. Re-run the failed job (it reads the title fresh)
+> or push a commit. Repos calling it with `workflow_call` should include
+> `edited` in their trigger, as above, so a retitle re-runs it.
 
 ### Required in the calling repository
 
@@ -53,19 +58,13 @@ this one.
 
 ## What gets validated
 
-Two independent checks, because which text reaches the default branch depends on
-the merge strategy:
+Only the **PR title**. The org allows squash merges only, with
+`squash_merge_commit_title: PR_TITLE` and `squash_merge_commit_message: PR_BODY`,
+so the title is the commit release-please parses. Commit messages inside the PR
+are deliberately not checked, since they never land.
 
-| Merge strategy | What lands on the default branch | Covered by |
-| --- | --- | --- |
-| Squash, multiple commits | The PR title | `Validate PR Title` |
-| Squash, single commit | That commit's message | `Validate PR Title` (`validateSingleCommit`) |
-| Merge commit | Every commit, verbatim | `Validate Conventional Commit Messages` |
-| Rebase | Every commit, verbatim | `Validate Conventional Commit Messages` |
-
-The squash cases matter because `squash_merge_commit_title` is
-`COMMIT_OR_PR_TITLE`, which means the PR title becomes the commit message
-release-please parses.
+In a merge queue (`merge_group`), the job runs and passes without re-checking:
+there is no PR title there, and it was already validated on the PR.
 
 ### Accepted types
 
@@ -88,12 +87,12 @@ feat!: drop v1 API
 feat(api)!: drop v1 API
 ```
 
-Messages beginning with `Merge `, `Revert `, `Reapply ` or `Initial plan` are
-exempt — git and GitHub generate those.
+GitHub's "Revert" button titles the PR `Revert "..."`, which fails the check;
+retitle it to `revert: ...`.
 
 ### Breaking changes
 
-Use `!` after the type/scope, or a `BREAKING CHANGE:` footer in the body:
+Put `!` after the type/scope in the PR title:
 
 ```
 feat!: drop support for Kubernetes 1.28
@@ -104,8 +103,8 @@ rejected. release-please parses them as an ordinary type and falls through to a
 patch bump, so a commit written that way produces a patch release instead of the
 major one it looks like it is asking for.
 
-Because a PR title is a single line, `!` is the only way to mark a breaking
-change there — a `BREAKING CHANGE:` footer has nowhere to live.
+A `BREAKING CHANGE:` footer in the PR description (it becomes the commit body)
+also works, but only as the description's very last paragraph, so prefer `!`.
 
 ## Version bumps
 
@@ -134,17 +133,6 @@ this org releases through release-please, which never reads that file.
 They remain only because existing repository rules still require them. To
 retire: drop `.github/configs/labeler.yml` and `.github/release.yml` from
 `github-shared-files-sync`, then delete the step from this workflow.
-
-## Known limitations
-
-`webiny/action-conventional-commits` fetches PR commits with a single
-unpaginated request, so it validates only the **first 30 commits** of a pull
-request. Its error handling also returns an empty commit list on any API
-failure, which the action reports as `No commits to check, skipping...` and
-exits successfully — the check fails open. Both behaviors are upstream.
-
-Neither affects squash merges, where only the PR title reaches the default
-branch and `Validate PR Title` covers it.
 
 ## Conventions
 
