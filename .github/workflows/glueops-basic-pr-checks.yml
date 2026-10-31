@@ -3,9 +3,9 @@ name: GlueOps Standard Checks
 on:
   workflow_call:
   pull_request:
-    # 'edited' re-runs the check after a retitle, but only for workflow_call
-    # callers: the org ruleset ignores 'types', so there a fixed title needs a
-    # re-run of the failed job (the title is read fresh from the API) or a push.
+    # The org ruleset ignores 'types' and workflow_call callers use their own
+    # trigger, so a fixed title needs a re-run of the failed job (the title is
+    # read fresh from the API) or a push. See README.
     types: [opened, edited, synchronize, reopened]
   merge_group: # required checks must also report on merge queue runs
 
@@ -14,20 +14,14 @@ permissions:
   pull-requests: read
 
 jobs:
-  # Job id is load-bearing: it forms the branch-protection check name
-  # "PR_CHECKS_AND_LABELS / PR_CHECKS_AND_LABELS" in every calling repo.
-  # Renaming it silently breaks required status checks, so it stays as-is even
-  # though this workflow no longer assigns labels.
+  # Job id is load-bearing: it is the required check's name in every repo.
+  # Renaming it breaks required status checks.
   PR_CHECKS_AND_LABELS:
     runs-on: ubuntu-latest
     steps:
       # Only the PR title reaches the default branch (squash-only, PR_TITLE), so
       # commit messages are deliberately not checked. 'types' must be exactly
       # release-please's DEFAULT_HEADINGS; see README "Accepted types".
-      #
-      # This action parses with conventional-changelog-conventionalcommits, the
-      # same preset release-please depends on, so it understands the "!"
-      # breaking-change marker natively.
       - name: Validate PR Title
         # A merge_group run has no PR title; the title was already checked on the PR.
         if: github.event_name != 'merge_group'

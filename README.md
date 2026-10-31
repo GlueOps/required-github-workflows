@@ -1,10 +1,8 @@
 # required-github-workflows
 
 Centrally maintained GitHub Actions workflows that every GlueOps repository is
-expected to run. Consuming repos call them via `workflow_call` rather than
-copying them, so a fix here lands everywhere at once.
-
-Please point to a tagged release.
+expected to run. The `glueops` org ruleset runs them from this repo's `main`, so
+a fix here lands everywhere at once.
 
 ## Workflows
 
@@ -27,9 +25,10 @@ on:
 
 jobs:
   PR_CHECKS_AND_LABELS:
-    uses: GlueOps/required-github-workflows/.github/workflows/glueops-basic-pr-checks.yml@<tag>
-    secrets: inherit
+    uses: GlueOps/required-github-workflows/.github/workflows/glueops-basic-pr-checks.yml@<commit-sha>
 ```
+
+The repo has no tags, so pin a commit SHA. The workflow needs no secrets.
 
 Most repos don't call it at all: the `glueops` org ruleset runs it from this
 repo's `main` on every PR and merge queue run.
@@ -57,17 +56,17 @@ there is no PR title there, and it was already validated on the PR.
 feat  fix  perf  deps  revert  docs  style  chore  refactor  test  build  ci
 ```
 
-This is release-please's `DEFAULT_HEADINGS` set. Types outside it are **silently
-dropped** — release-please logs the parse failure at `debug` level and the commit
-simply never appears in the changelog. That silence is the reason this check
-exists.
+This is release-please's `DEFAULT_HEADINGS` set. A commit with any other type is
+**silently dropped**: it never appears in the changelog, and merged on its own it
+cuts no release (with other commits it only adds a patch bump). That silence is
+the reason this check exists.
 
 Format: `<type>[optional scope][!]: <description>`
 
 ```
 feat: add support for tenant DNS
 fix(api): correct pagination cursor
-chore(deps): bump argo-cd to 2.13.1
+deps: update argo-cd to 2.13.1
 feat!: drop v1 API
 feat(api)!: drop v1 API
 ```
@@ -84,9 +83,8 @@ feat!: drop support for Kubernetes 1.28
 ```
 
 `breaking:`, `major:` and `hotfix:` are **not** release-please types and are
-rejected. release-please parses them as an ordinary type and falls through to a
-patch bump, so a commit written that way produces a patch release instead of the
-major one it looks like it is asking for.
+rejected: release-please drops such a commit (see above) instead of cutting the
+major release it looks like it is asking for.
 
 A `BREAKING CHANGE:` footer in the PR description (it becomes the commit body)
 also works, but only as the description's very last paragraph, so prefer `!`.
@@ -97,18 +95,14 @@ release-please derives the bump from the commits, not from any label:
 
 | Commit | Bump |
 | --- | --- |
-| `!` or `BREAKING CHANGE:` footer | major |
+| `!` or `BREAKING CHANGE:` footer | major (minor below 1.0 with `bump-minor-pre-major`) |
 | `feat:` | minor |
 | Any other recognized type | patch |
 | Unrecognized type | none — the commit is dropped |
 
-This workflow applies no labels. It used to add `patch`/`minor`/`major`/`enhancement`
-and `include-in-release-notes`. `.github/configs/labeler.yml` (synced into repos by
-`github-shared-files-sync`) is no longer read by this workflow.
-They were consumed only by `.github/release.yml`, which release-please ignores —
-it writes its own release body from the changelog. Renovate never read them
-either; `auto-merge.json` gates on `matchUpdateTypes`, Renovate's internal
-update classification, not GitHub labels.
+This workflow applies no labels; the bump comes only from the commit.
+`.github/configs/labeler.yml` (synced into repos by `github-shared-files-sync`)
+is no longer read.
 
 ## Conventions
 
@@ -120,6 +114,3 @@ resolved code stays immutable:
 uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
 ```
 
-The job id `PR_CHECKS_AND_LABELS` is load-bearing: it forms the branch
-protection check name `PR_CHECKS_AND_LABELS / PR_CHECKS_AND_LABELS` in every
-calling repo. Renaming it silently breaks required status checks.
