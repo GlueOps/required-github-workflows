@@ -3,44 +3,42 @@ name: GlueOps Standard Checks
 on:
   workflow_call:
   pull_request:
+    # The org ruleset ignores 'types' and workflow_call callers use their own
+    # trigger, so a fixed title needs a re-run of the failed job (the title is
+    # read fresh from the API) or a push. See README.
+    types: [opened, edited, synchronize, reopened]
+  merge_group: # required checks must also report on merge queue runs
 
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
+  # Job id is load-bearing: it is the required check's name in every repo.
+  # Renaming it breaks required status checks.
   PR_CHECKS_AND_LABELS:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      # Only the PR title reaches the default branch (squash-only, PR_TITLE), so
+      # commit messages are deliberately not checked. 'types' must be exactly
+      # release-please's DEFAULT_HEADINGS; see README "Accepted types".
+      - name: Validate PR Title
+        # A merge_group run has no PR title; the title was already checked on the PR.
+        if: github.event_name != 'merge_group'
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Validate Conventional Commit Messages
-        uses: webiny/action-conventional-commits@8bc41ff4e7d423d56fa4905f6ff79209a78776c7 # v1.3.0
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Optional, for private repositories.
-          allowed-commit-types: "fix,docs,style,refactor,test,chore,pref,ci,chore,feat,breaking,major,revert"
-
-      - name: Add default PR Labels
-        uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9 # v5
-        with:
-          configuration-path: ".github/configs/labeler.yml"
-
-      - name: Assign PR Labels based on conventional commit messages
-        id: action-assign-labels
-        uses: mauroalderete/action-assign-labels@671a4ca2da0f900464c58b8b5540a1e07133e915 # v1
-        with:
-          pull-request-number: ${{ github.event.pull_request.number }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          conventional-commits: |
-            conventional-commits:
-              - type: 'fix'
-                nouns: ['fix', 'docs', 'style', 'refactor', 'test', 'chore', 'pref', 'ci', 'hotfix']
-                labels: ['patch']
-              - type: 'feature'
-                nouns: ['feat']
-                labels: ['minor','enhancement']
-              - type: 'breaking_change'
-                nouns: ['breaking', 'major', 'BREAKING']
-                labels: ['major']
-          maintain-labels-not-matched: false
-          apply-changes: true
+          types: |
+            feat
+            fix
+            perf
+            deps
+            revert
+            docs
+            style
+            chore
+            refactor
+            test
+            build
+            ci
